@@ -1,0 +1,25 @@
+flowchart LR
+    Admin([Administrator])
+    User([Phone Tracker User])
+    subgraph GPS[GPS Tracking and Management System]
+      UC1((Register tracker))
+      UC2((View live map))
+      UC3((Inspect telemetry))
+      UC4((View route history))
+      UC5((Start tracking))
+      UC6((Send location update))
+      UC7((Start trip))
+      UC8((End trip))
+      UC9((Manage trip records))
+    end
+    Admin --- UC1
+    Admin --- UC2
+    Admin --- UC3
+    Admin --- UC4
+    Admin --- UC9
+    User --- UC5
+    User --- UC6
+    User --- UC7
+    User --- UC8
+    UC7 -. creates .-> UC9
+    UC8 -. completes .-> UC9

@@ -1,0 +1,26 @@
+erDiagram
+    DEVICES ||--o{ LOCATIONS : produces
+    DEVICES ||--o{ TRIPS : has
+    DEVICES {
+        INTEGER id PK
+        TEXT name
+        TEXT device_type
+        TEXT status
+        TEXT created_at
+    }
+    LOCATIONS {
+        INTEGER id PK
+        INTEGER device_id FK
+        REAL latitude
+        REAL longitude
+        REAL speed
+        REAL accuracy
+        TEXT recorded_at
+    }
+    TRIPS {
+        INTEGER id PK
+        INTEGER device_id FK
+        TEXT started_at
+        TEXT ended_at
+        TEXT status
+    }

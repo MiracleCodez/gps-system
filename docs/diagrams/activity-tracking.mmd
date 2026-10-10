@@ -1,0 +1,19 @@
+flowchart TD
+    Start([Open tracker page]) --> Load[Load first registered tracker]
+    Load --> Permission{Location permission granted?}
+    Permission -- No --> Error[Show permission error]
+    Error --> Stop([Stop])
+    Permission -- Yes --> StartTracking[Start geolocation watcher]
+    StartTracking --> Reading[Read GPS position]
+    Reading --> Valid{Position valid?}
+    Valid -- No --> ReadError[Show location error]
+    ReadError --> StopWatching[Stop watcher]
+    Valid -- Yes --> Post[POST location to API]
+    Post --> Stored{API accepts point?}
+    Stored -- No --> ApiError[Show API error]
+    ApiError --> Reading
+    Stored -- Yes --> Update[Update coordinates and update count]
+    Update --> Continue{Still tracking?}
+    Continue -- Yes --> Reading
+    Continue -- No --> StopWatching
+    StopWatching --> End([Tracking stopped])

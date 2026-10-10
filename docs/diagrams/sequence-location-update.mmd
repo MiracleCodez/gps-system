@@ -1,0 +1,23 @@
+sequenceDiagram
+    actor Phone as Phone User
+    participant Browser as Tracker Browser
+    participant API as Express API
+    participant DB as SQLite
+    participant Dashboard as Admin Dashboard
+    Phone->>Browser: Press Start tracking
+    Browser->>Browser: Request geolocation permission
+    Phone-->>Browser: Allow permission
+    loop Each GPS reading
+      Browser->>Browser: Read latitude, longitude, speed, accuracy
+      Browser->>API: POST /api/locations
+      API->>API: Validate device and coordinate ranges
+      API->>DB: INSERT location
+      DB-->>API: Created location ID
+      API->>DB: UPDATE device status
+      API-->>Browser: 201 Created
+      Dashboard->>API: GET /api/devices (refresh)
+      API->>DB: Query latest locations
+      DB-->>API: Device telemetry
+      API-->>Dashboard: JSON devices and latest points
+      Dashboard->>Dashboard: Update marker and telemetry
+    end

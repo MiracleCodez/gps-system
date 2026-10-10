@@ -11,6 +11,18 @@ The app has two views:
 
 The backend stores devices, GPS points, and trips in SQLite. A demo tracker with sample coordinates is created automatically on first startup so the map is not empty.
 
+## Thesis documentation package
+
+The repository includes a thesis-ready technical handbook with the analysis, methodology, requirements, architecture, database design, data dictionary, API specification, implementation description, testing plan, limitations, user guide, and recommended chapter structure:
+
+- [Download the thesis documentation Markdown](docs/GPS-System-Thesis-Documentation.md)
+- [Download the thesis documentation PDF](docs/GPS-System-Thesis-Documentation.pdf)
+- [Open the documentation index](docs/README.md)
+- [Browse Mermaid diagram sources](docs/diagrams/)
+- [Browse rendered PNG diagrams](docs/rendered/)
+
+The diagrams include system context, use case, data-flow, architecture, ERD, sequence, activity, and deployment views.
+
 ## Run locally
 
 ```bash
@@ -38,4 +50,4 @@ The MVP is intentionally hardware-free. A thesis can extend it with role-based a
 
 ## Project status
 
-MVP complete: responsive dashboard, smartphone geolocation tracker, SQLite persistence, trip management, map display, demo seed data, and API smoke-test coverage through the health endpoint.
+MVP complete: responsive dashboard, smartphone geolocation tracker, SQLite persistence, trip management, map display, demo seed data, API smoke-test coverage, and thesis documentation artifacts.

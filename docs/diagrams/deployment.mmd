@@ -1,0 +1,6 @@
+flowchart LR
+    Phone[Smartphone browser<br/>GPS + tracker.html] -->|HTTPS| Internet((Network))
+    Laptop[Laptop browser<br/>dashboard] -->|HTTPS| Internet
+    Internet --> Server[Node.js / Express server]
+    Server --> Database[(SQLite file)]
+    Server --> Map[OpenStreetMap tile service]

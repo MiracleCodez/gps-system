@@ -1,0 +1,24 @@
+flowchart TB
+    subgraph Presentation[Presentation tier]
+      Dashboard[Administrator Dashboard<br/>HTML CSS JavaScript Leaflet]
+      Tracker[Smartphone Tracker Page<br/>Browser Geolocation API]
+    end
+    subgraph Application[Application tier]
+      Express[Node.js + Express Server]
+      Validation[Validation and status logic]
+      Routes[REST endpoints]
+    end
+    subgraph Data[Data tier]
+      SQLite[(SQLite database)]
+      Devices[devices]
+      Locations[locations]
+      Trips[trips]
+    end
+    Dashboard --> Routes
+    Tracker --> Routes
+    Routes --> Validation --> Express
+    Express --> SQLite
+    SQLite --- Devices
+    SQLite --- Locations
+    SQLite --- Trips
+    Dashboard --> Leaflet[Leaflet map + OpenStreetMap tiles]

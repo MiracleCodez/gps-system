@@ -1,0 +1,32 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS devices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  device_type TEXT NOT NULL DEFAULT 'smartphone',
+  status TEXT NOT NULL DEFAULT 'offline',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS locations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id INTEGER NOT NULL,
+  latitude REAL NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+  longitude REAL NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+  speed REAL DEFAULT 0,
+  accuracy REAL,
+  recorded_at TEXT NOT NULL,
+  CONSTRAINT fk_locations_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_locations_device_time
+  ON locations(device_id, recorded_at DESC);
+
+CREATE TABLE IF NOT EXISTS trips (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id INTEGER NOT NULL,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  CONSTRAINT fk_trips_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+);

@@ -1,0 +1,7 @@
+flowchart LR
+    Admin([Administrator / Fleet Manager]) -->|register trackers, inspect map, review reports| Web[GPS System Web Dashboard]
+    Phone([Smartphone Tracker User]) -->|grant permission, start tracking, start/end trip| Tracker[Phone Tracker Web Page]
+    Tracker -->|HTTPS JSON location updates| API[Express REST API]
+    Web -->|query devices, locations, trips| API
+    API --> DB[(SQLite Database)]
+    Web -->|map tiles| OSM[(OpenStreetMap)]
