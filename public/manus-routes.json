@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "path": "/", "title": "GPS System Dashboard" },
+    { "path": "/tracker.html", "title": "Phone Tracker" }
+  ]
+}
