@@ -1,0 +1,8 @@
+flowchart TD
+    S([Field user travels]) --> P[Observe or check current location]
+    P --> M{Location requested?}
+    M -- No --> W[Continue journey without central record]
+    M -- Yes --> C[Call or send a message to supervisor]
+    C --> R[Supervisor writes location and time manually]
+    R --> E([Information remains in separate records])
+    W --> E

@@ -15,13 +15,17 @@ The backend stores devices, GPS points, and trips in SQLite. A demo tracker with
 
 The repository includes a thesis-ready technical handbook with the analysis, methodology, requirements, architecture, database design, data dictionary, API specification, implementation description, testing plan, limitations, user guide, and recommended chapter structure:
 
-- [Download the thesis documentation Markdown](docs/GPS-System-Thesis-Documentation.md)
-- [Download the thesis documentation PDF](docs/GPS-System-Thesis-Documentation.pdf)
+- [Final-year thesis draft Markdown](docs/Final-Year-Thesis-Draft.md)
+- [Final-year thesis draft PDF](docs/Final-Year-Thesis-Draft.pdf)
+- [Thesis documentation handbook Markdown](docs/GPS-System-Thesis-Documentation.md)
+- [Thesis documentation handbook PDF](docs/GPS-System-Thesis-Documentation.pdf)
+- [Database schema SQL](docs/database-schema.sql)
+- [Research sources and fieldwork notes](docs/research-sources.md)
 - [Open the documentation index](docs/README.md)
 - [Browse Mermaid diagram sources](docs/diagrams/)
 - [Browse rendered PNG diagrams](docs/rendered/)
 
-The diagrams include system context, use case, data-flow, architecture, ERD, sequence, activity, and deployment views.
+The diagrams include system context, use case, data-flow, architecture, ERD, sequence, activity, deployment, function decomposition, and existing-process views.
 
 ## Run locally
 
@@ -44,10 +48,6 @@ Then open [http://localhost:3000](http://localhost:3000). For a phone on the sam
 | POST | `/api/trips/end` | End the active trip |
 | GET | `/api/trips` | List recent trips |
 
-## Thesis extension ideas
-
-The MVP is intentionally hardware-free. A thesis can extend it with role-based authentication, geofences, route-deviation alerts, SMS/email notifications, a PWA install flow, PostgreSQL/PostGIS, and analytics for distance, speed violations, and device uptime.
-
 ## Project status
 
-MVP complete: responsive dashboard, smartphone geolocation tracker, SQLite persistence, trip management, map display, demo seed data, API smoke-test coverage, and thesis documentation artifacts.
+MVP and thesis documentation complete: responsive dashboard, smartphone geolocation tracker, SQLite persistence, trip management, map display, demo seed data, API smoke-test coverage, thesis draft, database schema, research source notes, editable diagrams, rendered diagrams, and PDF exports.

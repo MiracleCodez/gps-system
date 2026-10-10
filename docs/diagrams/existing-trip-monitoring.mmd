@@ -1,0 +1,9 @@
+flowchart TD
+    S([Trip begins]) --> I[User informs supervisor by phone or message]
+    I --> M[Supervisor relies on verbal updates]
+    M --> Q{Delay or incident reported?}
+    Q -- Yes --> F[Supervisor follows up manually]
+    Q -- No --> U[Wait for next update]
+    F --> U
+    U --> Q
+    Q -. Trip ends .-> E([Completion communicated manually])
