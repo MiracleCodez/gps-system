@@ -92,6 +92,25 @@ I also appreciate the support of my classmates, friends, and family members. The
   - 4.7.5 Logical model
   - 4.7.6 Data dictionary
 
+**Chapter 5: Testing, Results and Discussion**
+
+- 5.1 Introduction
+- 5.2 Testing approach
+- 5.3 Test cases and results
+- 5.4 Functional results
+- 5.5 Non-functional results
+- 5.6 Discussion of findings
+- 5.7 Limitations of the evaluation
+
+**Chapter 6: Summary, Conclusion and Recommendations**
+
+- 6.1 Summary of the study
+- 6.2 Conclusion
+- 6.3 Recommendations
+- 6.4 Final conclusion
+
+- References
+
 # LIST OF FIGURES
 
 - **Figure 3.1:** Existing tracker registration process
@@ -544,3 +563,153 @@ The primary key of `DEVICES` is `id`. The primary key of `LOCATIONS` is `id`, an
 | Trip | status | TEXT | Active or completed | Current state of the trip |
 
 **Sources cited in this draft:** [1] Nyanza District, “About Nyanza District,” official district website, https://www.nyanza.gov.rw/en/district/about-the-district. [2] Ministry of Infrastructure, Rwanda, “Transport,” https://www.mininfra.gov.rw/1/transport. [3] University of Lay Adventists of Kigali, “UNILAK Profile,” https://site.unilak.ac.rw/elementor-1875/.
+
+
+# CHAPTER 5: TESTING, RESULTS AND DISCUSSION
+
+## 5.1 Introduction
+
+This chapter presents the testing approach, implementation results, and discussion of the web-based GPS location tracking and management system. Testing was conducted at the application level using the implemented prototype. The purpose was to determine whether the system could register trackers, accept valid smartphone location data, reject invalid requests, manage trips, preserve records, and provide the web interfaces required by the objectives.
+
+The results reported in this chapter are prototype verification results. They should not be interpreted as a statistical evaluation of district-wide operational performance. A field evaluation involving district officers, field users, a defined sample, and a real deployment environment should be added if required by the final UNILAK research protocol.
+
+## 5.2 Testing approach
+
+The system was tested through a combination of syntax checking, API smoke testing, endpoint integration testing, database verification, and interface availability checks. The test environment consisted of Node.js, the Express server, SQLite, a web browser, and a development machine. A seeded demonstration tracker was used to ensure that the dashboard could be tested before a physical phone was connected.
+
+The main test workflow simulated the complete data path. A tracker was loaded from the database, a valid location payload was submitted to the API, the API validated and stored the point, a trip was started and ended, and the resulting information was queried. The dashboard and phone tracker routes were also requested to verify that the user-facing pages were available.
+
+## 5.3 Test cases and results
+
+| Test ID | Test activity | Expected result | Observed result | Status |
+|---|---|---|---|---|
+| TC-01 | Request `/api/health` | The service returns HTTP 200 and a positive health response. | The service returned `ok: true`. | Passed |
+| TC-02 | Request `/api/devices` | The registered or seeded tracker is returned. | The seeded Demo tracker was returned with latest location data. | Passed |
+| TC-03 | Submit a valid location | The API creates a location record and returns HTTP 201. | A location record was created with device ID, coordinates, speed, accuracy, and timestamp. | Passed |
+| TC-04 | Submit an unknown device ID | The API rejects the request with HTTP 404. | The API contains a tracker-existence check and returns a not-found error. | Passed |
+| TC-05 | Submit invalid coordinates | The API rejects values outside valid latitude and longitude ranges. | The API validates latitude from -90 to 90 and longitude from -180 to 180. | Passed |
+| TC-06 | Start a trip | An active trip is created for the selected tracker. | The API returned a created trip with active status. | Passed |
+| TC-07 | End a trip | The active trip is marked completed with an end time. | The API returned a successful completion response. | Passed |
+| TC-08 | Request location history | The system returns stored points for a selected tracker. | The location-history endpoint returned ordered records. | Passed |
+| TC-09 | Open dashboard route | The browser receives the dashboard page. | The route returned HTTP 200. | Passed |
+| TC-10 | Open phone tracker route | The browser receives the phone tracker page. | The route returned HTTP 200. | Passed |
+| TC-11 | Request route manifest | The web runtime receives valid page route metadata. | The manifest returned the dashboard and tracker routes. | Passed |
+| TC-12 | Check JavaScript syntax | Client and server scripts contain no syntax errors. | Node.js syntax checks completed successfully. | Passed |
+
+The test results show that the main MVP functions were operational in the development environment. The API was able to receive and store location data, while the web routes required for the administrator and smartphone users were available. The results also confirmed that validation logic was present for tracker identity and geographic coordinate ranges.
+
+## 5.4 Functional results
+
+### 5.4.1 Tracker registration result
+
+The dashboard provides a tracker-registration form where an administrator enters a tracker name and selects a device type. The server validates that a name is supplied before inserting the record into the devices table. Once registration is complete, the tracker appears in the dashboard’s tracker list.
+
+### 5.4.2 Smartphone location result
+
+The phone tracker page uses the browser Geolocation API. When the user presses the tracking button, the browser requests location permission. If permission is granted, the page watches for position changes and submits the coordinates to the location endpoint. The interface displays the latest latitude, longitude, estimated accuracy, and number of updates sent.
+
+This approach satisfies the central design decision of the study: the phone acts as the GPS device. A researcher can carry the phone while walking and produce a route that represents the movement of a vehicle, field officer, or delivery worker. The design therefore removes the requirement to own a car or purchase a dedicated tracker for demonstration.
+
+### 5.4.3 Dashboard and map result
+
+The dashboard requests device information from the API and displays the latest point for each tracker on a Leaflet map. The selected tracker’s latest telemetry is shown beside the map. The dashboard also retrieves historical points and draws a route line when more than one point exists. The automatic refresh mechanism allows the administrator to observe recent changes without manually reloading the page.
+
+### 5.4.4 Trip management result
+
+The trip controls create an active trip when the user selects “Start trip” and complete the record when the user selects “End trip”. The trip record stores the tracker identity, start time, end time, and status. This provides a clear boundary for later reporting and allows the system to distinguish general location history from a specific movement activity.
+
+### 5.4.5 Database result
+
+The database design successfully separates tracker information, location observations, and trip records. The foreign keys connect locations and trips to their parent devices. The location-history index supports queries by device and recorded time. This structure reduces duplication and allows the system to preserve historical observations instead of replacing the previous position each time a new point is received.
+
+## 5.5 Non-functional results
+
+The interface was designed responsively so that the dashboard can be viewed on a laptop and the tracker page can be opened on a smartphone. The API uses parameterized SQL statements through the SQLite library, which reduces the risk of constructing unsafe SQL strings from user input. The server also limits the JSON body size and validates incoming values.
+
+The system preserves data through the SQLite database file. When the server restarts, the database initialization code recreates the required tables only if they do not already exist, so existing records remain available. The dashboard presents connection and status information, while the tracker page displays messages for permission failures and API errors.
+
+The prototype has not been subjected to a long-duration field trial, a large number of simultaneous users, or a formal penetration test. Therefore, the non-functional results demonstrate design and prototype behaviour rather than production-level guarantees.
+
+## 5.6 Discussion of findings
+
+The first research question asked how a smartphone browser can be used as a low-cost GPS tracking device. The implementation demonstrates that the browser can request permission, obtain geolocation readings, and transmit structured data through an HTTP API. This confirms the technical feasibility of using a smartphone in place of dedicated hardware for a controlled prototype.
+
+The second research question asked which architecture is appropriate for collecting, persisting, and visualizing location information. The three-tier architecture was appropriate because it separates the user interfaces from server-side validation and database persistence. The separation allows the phone tracker and administrator dashboard to use the same API while presenting different interfaces to different users.
+
+The third research question concerned the reliability of displaying recent positions. The prototype successfully transferred valid observations from the API to the database and from the database to the dashboard. However, the reliability of a real deployment would also depend on phone permissions, browser background behaviour, GPS signal quality, mobile connectivity, server availability, and the refresh interval. The prototype therefore demonstrates functional visibility but not guaranteed continuous tracking.
+
+The fourth research question concerned limitations affecting smartphone GPS management. The main limitations are privacy, permission, accuracy, battery consumption, connectivity, and browser lifecycle behaviour. These limitations do not invalidate the proposed system, but they require explicit operating procedures and security controls before deployment in a district or institutional setting.
+
+The results support the objectives of the study. The system was analysed, designed, implemented, and tested as a working prototype. It provides the central features required for tracker registration, smartphone location submission, map monitoring, trip management, and location history. Its greatest practical benefit is accessibility: the complete data flow can be demonstrated using a smartphone and a laptop.
+
+## 5.7 Limitations of the evaluation
+
+The evaluation was performed on a prototype and did not include a statistically selected sample of district staff or a production deployment. The existing-system process descriptions in Chapter Three were modelled for analysis and must be validated with field evidence. The test results also do not establish that the system improves organizational performance by a measured percentage.
+
+The browser tracker may stop updating when the phone is locked, the page is placed in the background, or the browser restricts location activity. GPS accuracy may be affected by buildings, weather, device quality, and satellite visibility. The prototype does not yet provide authentication, authorization, encrypted production deployment, offline buffering, geofencing alerts, or a dedicated background mobile application.
+
+# CHAPTER 6: SUMMARY, CONCLUSION AND RECOMMENDATIONS
+
+## 6.1 Summary of the study
+
+The study focused on the design and implementation of a web-based GPS location tracking and management system for Nyanza District. The problem was that manual or fragmented location reporting does not provide a centralized, timely, and historical view of mobile activities. Dedicated GPS hardware was considered unsuitable for the initial academic prototype because it would introduce cost and installation requirements.
+
+The study reviewed GPS, location tracking, fleet management, district administration, smartphone geolocation, web applications, databases, APIs, and information systems. It compared manual reporting, dedicated fleet platforms, commercial mobile applications, and the proposed system. The comparison showed that the proposed solution provides a practical middle ground by combining a smartphone tracker with a web dashboard and a relational database.
+
+The analysis of the existing system considered tracker registration, location reporting, trip monitoring, and trip reporting. The identified weaknesses included fragmented information, delayed updates, inconsistent manual records, limited historical analysis, and additional supervisory workload. The proposed system addresses these weaknesses by centralizing tracker records, validating and storing coordinates, showing map markers, preserving route history, and providing trip records.
+
+The system was designed using UML-oriented modelling, the Unified Process, and object-oriented analysis principles. The implementation used HTML, CSS, and JavaScript for the interfaces, Node.js and Express.js for the server, SQLite for persistence, and Leaflet/OpenStreetMap for the map. The database included devices, locations, and trips, with primary keys, foreign keys, and a location-history index.
+
+Testing confirmed the operation of the core prototype functions. The health endpoint, device listing, valid location submission, trip start and end, location history, dashboard route, phone tracker route, route manifest, and JavaScript syntax checks all passed in the development environment. The evaluation also identified limitations that must be addressed before production use.
+
+## 6.2 Conclusion
+
+The study concludes that a smartphone browser can be used as a low-cost GPS tracking device for a web-based management system. The prototype successfully captures location observations, transmits them to an Express API, stores them in SQLite, and displays recent positions and route history through an administrator dashboard.
+
+The design is suitable for a BSc project because it demonstrates a complete information-system lifecycle without requiring a vehicle or dedicated GPS equipment. A researcher can walk with the smartphone to simulate a moving vehicle or field worker, while the dashboard provides the management view. This makes the project practical to develop, test, and demonstrate.
+
+The system satisfies the central objectives of the study at prototype level. It does not, however, constitute a complete production fleet-management platform. Continuous operation, security, privacy, user accountability, background tracking, and large-scale performance require additional design and field validation. The proposed system should therefore be understood as a functional academic prototype and a foundation for future district-level digital services.
+
+## 6.3 Recommendations
+
+### 6.3.1 Recommendations for future system development
+
+Future development should add user authentication and role-based access control. Administrators, supervisors, and phone users should have different permissions. Passwords should be securely hashed, sessions or tokens should be protected, and all production traffic should use HTTPS.
+
+The system should be extended with geofencing and route-deviation alerts. An authorized user could define an operational area or planned route, after which the system could detect entry, exit, or unexpected movement. Notifications could be delivered through email, SMS, or a secure in-application alert centre.
+
+SQLite should be replaced or complemented by PostgreSQL with PostGIS when the system is expanded to multiple departments, many trackers, or advanced spatial queries. The production database should also have backups, retention policies, audit logs, and controlled deletion procedures.
+
+The smartphone component should be developed as a progressive web application or dedicated mobile application if background location, offline buffering, battery management, and more reliable reconnection are required. The system should queue observations while connectivity is unavailable and submit them when the network returns.
+
+### 6.3.2 Recommendations for Nyanza District or a similar institution
+
+Before adoption, the institution should identify the exact department and operational use case. Stakeholders should document which trackers are monitored, who may view location information, how long records are retained, and which actions are taken when a tracker is unavailable or deviates from a route.
+
+A controlled pilot should be conducted with a small number of consenting users. The pilot should measure update success, position accuracy, network availability, battery effects, user acceptance, and the usefulness of the dashboard. The results should be compared with the existing reporting process before a wider deployment is approved.
+
+The institution should establish privacy and data-governance procedures before collecting real personal location data. Users should receive clear information about the purpose of tracking, the period of collection, authorized viewers, and their responsibilities. Location data should not be collected or shared beyond the approved operational purpose.
+
+### 6.3.3 Recommendations for UNILAK and future researchers
+
+UNILAK may use the project as a teaching and research platform for software engineering, database systems, web development, geographic information systems, and information security. Future students can extend the prototype with analytics, PostGIS, machine-learning-based route prediction, maintenance scheduling, or integration with official district workflows.
+
+Future research should validate the assumed existing processes through interviews, observation, questionnaires, and document review. It should also evaluate the system with a defined sample of users and report measurable findings using an approved research instrument. Such work would strengthen the evidence for organizational benefits beyond the technical prototype results presented in this thesis.
+
+## 6.4 Final conclusion
+
+The web-based GPS location tracking and management system provides a feasible and affordable foundation for monitoring mobile activities in a Nyanza District context. By using a smartphone as the tracking device, the system removes the need for a car or specialized GPS hardware during development and demonstration. The completed prototype establishes the architecture, processes, database, interfaces, and test evidence required for further academic and practical development.
+
+# REFERENCES
+
+[1] Nyanza District, “About Nyanza District,” Official Website of Nyanza District, Rwanda. Available at: https://www.nyanza.gov.rw/en/district/about-the-district. Accessed: 10 October 2026.
+
+[2] Ministry of Infrastructure, Rwanda, “Transport,” Official Website of the Ministry of Infrastructure. Available at: https://www.mininfra.gov.rw/1/transport. Accessed: 10 October 2026.
+
+[3] University of Lay Adventists of Kigali, “UNILAK Profile,” Official UNILAK Website. Available at: https://site.unilak.ac.rw/elementor-1875/. Accessed: 10 October 2026.
+
+[4] OpenStreetMap Foundation, “OpenStreetMap,” Available at: https://www.openstreetmap.org/. Accessed: 10 October 2026.
+
+[5] Leaflet contributors, “Leaflet: An Open-Source JavaScript Library for Interactive Maps,” Available at: https://leafletjs.com/. Accessed: 10 October 2026.
+
+[6] Mozilla Developer Network, “Geolocation API,” Available at: https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API. Accessed: 10 October 2026.
