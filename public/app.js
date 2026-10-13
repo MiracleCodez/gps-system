@@ -1,6 +1,14 @@
 const state = { devices: [], selectedId: null, map: null, markers: new Map(), route: null };
 const $ = (selector) => document.querySelector(selector);
 
+async function loadSession() {
+  const response = await fetch('/api/session');
+  if (!response.ok) throw new Error('Authentication session is unavailable.');
+  const data = await response.json();
+  const user = data.user || {};
+  $('#account-name').textContent = user.name || user.email || 'Signed in';
+}
+
 function timeAgo(iso) {
   if (!iso) return 'No signal';
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -64,5 +72,5 @@ async function selectDevice(id, pan = true) {
 $('#show-add').addEventListener('click', () => $('#add-form').classList.toggle('hidden'));
 $('#add-form').addEventListener('submit', async (event) => { event.preventDefault(); const name = $('#device-name').value.trim(); if (!name) return; const response = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, deviceType: $('#device-type').value }) }); if (response.ok) { $('#device-name').value = ''; $('#add-form').classList.add('hidden'); await loadDevices(); } });
 setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString(); }, 1000);
-initMap(); loadDevices().catch((error) => { console.error(error); $('#device-list').innerHTML = '<div class="empty-state">Could not load the API. Is the server running?</div>'; });
+initMap(); Promise.all([loadSession(), loadDevices()]).catch((error) => { console.error(error); $('#device-list').innerHTML = '<div class="empty-state">Could not load the authenticated dashboard.</div>'; });
 setInterval(() => loadDevices().catch(console.error), 10000);

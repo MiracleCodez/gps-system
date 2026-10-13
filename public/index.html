@@ -13,7 +13,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/"><span class="brand-mark">⌁</span><span>GPS <b>system</b></span></a>
-    <div class="topbar-meta"><span class="pulse-dot"></span><span>Operations console</span><span class="divider"></span><a href="/tracker.html" class="button button-small button-ghost">Open phone tracker ↗</a></div>
+    <div class="topbar-meta"><span class="pulse-dot"></span><span>Operations console</span><span class="divider"></span><span id="account-name" class="account-name">Signed in</span><a href="/tracker.html" class="button button-small button-ghost">Open phone tracker ↗</a><a href="/auth/logout" class="button button-small button-ghost">Sign out</a></div>
   </header>
   <main class="workspace">
     <section class="intro-row">
@@ -30,7 +30,7 @@
     </section>
     <section class="panel history-panel"><div class="panel-head"><div><p class="eyebrow">Route history</p><h2>Recent location points</h2></div><span id="history-count" class="muted">—</span></div><div class="table-wrap"><table><thead><tr><th>Recorded</th><th>Latitude</th><th>Longitude</th><th>Speed</th><th>Accuracy</th></tr></thead><tbody id="history-body"><tr><td colspan="5" class="empty-state">Select a tracker to see its history.</td></tr></tbody></table></div></section>
   </main>
-  <footer><span>GPS system / prototype</span><span>Built for a BSc thesis project</span></footer>
+  <footer><span>GPS system / admin dashboard</span><span>Built for the Nyanza District BSc thesis system</span></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="/app.js"></script>
 </body>
 </html>
