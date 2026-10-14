@@ -284,7 +284,23 @@ app.post('/api/trips/end', (req, res) => {
   if (!result.changes) return res.status(404).json({ error: 'No active trip found.' });
   res.json({ ok: true });
 });
-app.get('/api/trips', requireAuth, (_req, res) => res.json(db.prepare('SELECT trips.*, devices.name AS device_name FROM trips JOIN devices ON devices.id = trips.device_id ORDER BY trips.started_at DESC LIMIT 50').all()));
+function haversineKm(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad;
+  const dLon = (b.longitude - a.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+app.get('/api/trips', requireAuth, (_req, res) => {
+  const trips = db.prepare('SELECT trips.*, devices.name AS device_name FROM trips JOIN devices ON devices.id = trips.device_id ORDER BY trips.started_at DESC LIMIT 50').all();
+  const points = db.prepare('SELECT latitude, longitude FROM locations WHERE device_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY recorded_at ASC');
+  res.json(trips.map((trip) => {
+    const rows = points.all(trip.device_id, trip.started_at, trip.ended_at || new Date().toISOString());
+    let distance = 0;
+    for (let i = 1; i < rows.length; i += 1) distance += haversineKm(rows[i - 1], rows[i]);
+    return { ...trip, points: rows.length, distance_km: Math.round(distance * 100) / 100 };
+  }));
+});
 
 app.use((err, _req, res, _next) => {
   console.error(err);
