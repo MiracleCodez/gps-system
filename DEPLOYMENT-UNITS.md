@@ -28,5 +28,5 @@ The deployment is divided into these units so work can resume cleanly:
 ## Unit 5 — Verify the public website
 
 - Confirm the public dashboard returns successfully.
-- Confirm `/tracker.html`, `/manus-routes.json`, and `/api/health` are publicly reachable.
+- Confirm `/tracker.html`, `/login`, and `/api/health` are publicly reachable.
 - Use the resulting URL for the thesis demonstration.

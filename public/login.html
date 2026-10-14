@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS System — Sign in</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .auth-wrap{min-height:calc(100vh - 74px);display:grid;place-items:center;padding:24px}
+    .auth-card{width:100%;max-width:400px;padding:28px 0 24px}
+    .auth-card h1{font-size:24px;margin:6px 28px 6px;letter-spacing:-.03em}
+    .auth-card .lede{margin:0 28px 18px;font-size:13px}
+    .auth-card .eyebrow{margin:0 28px}
+    .auth-form{display:flex;flex-direction:column;gap:12px;padding:0 28px}
+    .auth-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+    .auth-form input{flex:none;width:100%;font-size:14px;padding:12px}
+    .auth-form .button{width:100%;justify-content:center;padding:12px;margin-top:4px}
+    #auth-message{margin:0 28px 14px}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/"><span class="brand-mark">⌁</span><span>GPS <b>system</b></span></a></header>
+  <main class="auth-wrap">
+    <section class="panel auth-card">
+      <p class="eyebrow" id="auth-eyebrow">Loading…</p>
+      <h1 id="auth-title">GPS System — Nyanza District</h1>
+      <p class="lede" id="auth-lede"></p>
+      <div id="auth-message" class="notice hidden"></div>
+      <form id="auth-form" class="auth-form">
+        <label id="name-field" class="hidden">Full name<input id="name" autocomplete="name" maxlength="80"></label>
+        <label>Email<input id="email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <label id="confirm-field" class="hidden">Confirm password<input id="confirm" type="password" autocomplete="new-password" minlength="8"></label>
+        <button id="submit" class="button button-primary" type="submit">Continue</button>
+      </form>
+    </section>
+  </main>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    let setupMode = false;
+
+    function show(text, tone) {
+      const box = $('#auth-message');
+      box.textContent = text;
+      box.className = `notice ${tone || ''}`;
+    }
+
+    async function init() {
+      const status = await (await fetch('/api/auth/status')).json();
+      if (status.authenticated) return location.replace('/');
+      setupMode = status.setupRequired;
+      $('#auth-eyebrow').textContent = setupMode ? 'First-time setup' : 'Admin sign in';
+      $('#auth-lede').textContent = setupMode
+        ? 'No account exists yet. Create the administrator account for this system.'
+        : 'Sign in to open the operations console.';
+      $('#name-field').classList.toggle('hidden', !setupMode);
+      $('#confirm-field').classList.toggle('hidden', !setupMode);
+      $('#name').required = setupMode;
+      $('#confirm').required = setupMode;
+      $('#password').autocomplete = setupMode ? 'new-password' : 'current-password';
+      $('#submit').textContent = setupMode ? 'Create admin account' : 'Sign in';
+    }
+
+    $('#auth-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const password = $('#password').value;
+      if (setupMode && password !== $('#confirm').value) return show('Passwords do not match.', 'error');
+      $('#submit').disabled = true;
+      try {
+        const response = await fetch(setupMode ? '/api/auth/setup' : '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: $('#name').value, email: $('#email').value, password })
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'Something went wrong. Please try again.');
+        location.replace('/');
+      } catch (error) {
+        show(error.message, 'error');
+        $('#submit').disabled = false;
+      }
+    });
+
+    init().catch(() => show('Could not reach the server.', 'error'));
+  </script>
+</body>
+</html>
