@@ -108,20 +108,24 @@ I also appreciate the support of my classmates, friends, and family members. The
   - 4.7.4 Physical model
   - 4.7.5 Logical model
   - 4.7.6 Data dictionary
+  - 4.7.7 Supporting design diagrams
 
 **Chapter 5: Implementation of the New System**
 
 - 5.1 Introduction
 - 5.2 Implementation environment
 - 5.3 Server-side implementation
-- 5.4 REST API implementation
-- 5.5 Database implementation
-- 5.6 Dashboard implementation
-- 5.7 Smartphone tracker implementation
-- 5.8 Map and route implementation
-- 5.9 Application workflow
-- 5.10 Deployment and operation
-- 5.11 Implementation summary
+- 5.4 Account registration and authentication implementation
+- 5.5 REST API implementation
+- 5.6 Database implementation
+- 5.7 Dashboard implementation
+- 5.8 Smartphone tracker implementation
+- 5.9 Trip reporting and distance calculation
+- 5.10 Map and route implementation
+- 5.11 Application workflow
+- 5.12 Deployment and operation
+- 5.13 Working-system screenshots
+- 5.14 Implementation summary
 
 **Chapter 6: References**
 
@@ -135,6 +139,20 @@ I also appreciate the support of my classmates, friends, and family members. The
 - **Figure 4.2:** Context diagram of the proposed GPS management system
 - **Figure 4.3:** Level 0 data flow diagram
 - **Figure 4.4:** Entity relationship diagram
+- **Figure 4.5:** System architecture diagram
+- **Figure 4.6:** Location-update sequence diagram
+- **Figure 4.7:** Tracking activity diagram
+- **Figure 4.8:** Deployment diagram
+- **Figure 5.1:** First-run administrator account setup screen
+- **Figure 5.2:** Administrator sign-in screen
+- **Figure 5.3:** Authenticated management dashboard
+- **Figure 5.4:** Dashboard showing live tracker locations and telemetry
+- **Figure 5.5:** Route-history table showing recorded GPS points
+- **Figure 5.6:** Smartphone tracker location-permission prompt
+- **Figure 5.7:** Smartphone tracker transmitting live coordinates
+- **Figure 5.8:** Dashboard with a selected tracker and route history
+- **Figure 5.9:** Sign-in validation error screen
+- **Figure 5.10:** Additional authenticated dashboard view
 
 # LIST OF SYMBOLS & ABBREVIATIONS
 
@@ -161,11 +179,11 @@ I also appreciate the support of my classmates, friends, and family members. The
 
 This study presents the design and implementation of a web-based GPS location tracking and management system for Nyanza District. The study responds to the difficulty of obtaining timely, centralized, and reliable information about the location and movement of field personnel, mobile teams, or vehicles when monitoring depends on telephone calls, informal messages, and manually maintained records. The proposed system uses a smartphone browser as a low-cost GPS tracking device. The browser requests location permission, captures latitude, longitude, speed, accuracy, and time, and sends the data to a central web server. An administrator accesses a web dashboard to register trackers, view the latest locations on an interactive map, inspect location history, and manage trips.
 
-The system was designed using object-oriented analysis principles and UML-oriented modelling. The implementation uses HTML, CSS, and JavaScript for the client interface, Node.js and Express for the application server, SQLite for relational data storage, and Leaflet with OpenStreetMap for map visualization. The source code, release package, and implementation documentation are maintained in the project repository at https://github.com/MiracleCodez/gps-system. The database contains devices, locations, and trips. The system is intended as a practical, deployable solution that can be used and demonstrated without owning a car or purchasing a dedicated GPS unit, because a smartphone carried by a walking user can simulate the movement of a vehicle or field team.
+The system was designed using object-oriented analysis principles and UML-oriented modelling. The implementation uses HTML, CSS, and JavaScript for the client interface, Node.js and Express for the application server, SQLite for relational data storage, and Leaflet with OpenStreetMap for map visualization. The completed system also implements local account registration, first-run administrator setup, password hashing with scrypt, signed seven-day sessions, temporary login lockout, administrator and viewer roles, password recovery through a command-line utility, trip reporting, distance calculation, and authenticated dashboard access. The source code, release package, screenshots, and implementation documentation are maintained in the project repository at https://github.com/MiracleCodez/gps-system. The system is intended as a practical, deployable solution that can be used and demonstrated without owning a car or purchasing a dedicated GPS unit, because a smartphone carried by a walking user can simulate the movement of a vehicle or field team.
 
-The expected contribution is a transparent, affordable, and extensible platform for location monitoring. The system is not presented as a replacement for a production fleet-management platform without further work. Production deployment would require authenticated users, role-based access, HTTPS, stronger privacy controls, retention policies, and testing with district stakeholders. The completed system establishes the technical basis for these future extensions.
+The expected contribution is a transparent, affordable, and extensible platform for location monitoring. The implemented access-control layer protects the management dashboard while allowing the smartphone tracker to submit valid field observations. Further production hardening would include external security review, stronger secret management, database backups, privacy policies, audit logging, and testing with district stakeholders. The completed system therefore provides both a working operational application and a documented technical basis for future expansion.
 
-**Keywords:** GPS, location tracking, fleet management, smartphone geolocation, web application, Nyanza District, information system.
+**Keywords:** GPS, location tracking, fleet management, smartphone geolocation, authentication, trip reporting, web application, Nyanza District, information system.
 
 # CHAPTER 1: INTRODUCTION
 
@@ -467,6 +485,14 @@ The level 0 data-flow diagram decomposes the system into tracker management, loc
 | FR-11 | The user shall start a trip for a tracker. |
 | FR-12 | The user shall end an active trip. |
 | FR-13 | The administrator shall view recorded trip information. |
+| FR-14 | The system shall provide first-run setup for the first administrator account. |
+| FR-15 | The system shall allow a registered user to sign in and sign out. |
+| FR-16 | The system shall hash passwords before storing them in SQLite. |
+| FR-17 | The system shall support administrator and read-only viewer roles. |
+| FR-18 | The system shall temporarily block repeated failed login attempts from one address. |
+| FR-19 | The system shall allow a viewer account to be created after administrator setup. |
+| FR-20 | The system shall calculate and display trip duration, distance, point count, and status. |
+| FR-21 | The system shall show distinct tracker marker colours, labels, and selected-marker emphasis on the map. |
 
 ### 4.6.2 Non-functional requirements
 
@@ -480,25 +506,28 @@ The level 0 data-flow diagram decomposes the system into tracker management, loc
 | NFR-06 | The deployment shall use HTTPS when accessed from a physical phone outside localhost. |
 | NFR-07 | The system should use parameterized database statements to reduce injection risk. |
 | NFR-08 | Production deployment shall restrict access to authorized users and protect personal location data. |
-| NFR-09 | The system should remain sufficiently simple for installation and demonstration in a BSc environment. |
+| NFR-09 | Passwords shall not be stored as plain text. |
+| NFR-10 | Authenticated sessions shall expire after seven days. |
+| NFR-11 | The system shall provide understandable feedback for invalid credentials, duplicate accounts, and temporary lockout. |
+| NFR-12 | The system should remain sufficiently simple for installation and demonstration in a BSc environment. |
 
 ## 4.7 Database design
 
 ### 4.7.1 Entities
 
-The database contains three main entities. The **Device** entity represents a registered smartphone or future GPS device. The **Location** entity represents one position observation submitted by a device. The **Trip** entity represents a period of movement associated with a device.
+The database contains five implemented tables. The **User** entity represents an account that can access the system. The **Setting** entity stores application-level configuration such as the generated session secret. The **Device** entity represents a registered smartphone or future GPS device. The **Location** entity represents one position observation submitted by a device. The **Trip** entity represents a period of movement associated with a device.
 
-The design intentionally separates devices from locations. A device can submit many observations over time, while each observation belongs to one device. This structure avoids repeating device names and types in every location record. Trips are also separated because a device may complete many trips, and a trip may be analysed independently of the device’s entire history.
+The design intentionally separates users, devices, locations, and trips. User records support authentication and authorization without repeating account data in operational records. A device can submit many observations over time, while each observation belongs to one device. This structure avoids repeating device names and types in every location record. Trips are also separated because a device may complete many trips, and a trip may be analysed independently of the device’s entire history.
 
 ### 4.7.2 Relationships and cardinality
 
-The relationship between Device and Location is one-to-many. One device can produce zero, one, or many location records. Every location record must belong to exactly one device. The relationship between Device and Trip is also one-to-many. One device can have zero, one, or many trips, and every trip must belong to exactly one device.
+The relationship between Device and Location is one-to-many. One device can produce zero, one, or many location records. Every location record must belong to exactly one device. The relationship between Device and Trip is also one-to-many. One device can have zero, one, or many trips, and every trip must belong to exactly one device. The User and Setting tables are independent support tables: users are resolved by the signed session token, while settings store application configuration.
 
 The foreign key `locations.device_id` references `devices.id`. The foreign key `trips.device_id` references `devices.id`. Cascade deletion is used in the implemented system so that deleting a device also removes dependent location and trip records. A production system should apply deletion policies carefully because location history may be subject to legal, operational, or audit requirements.
 
 ### 4.7.3 Attributes
 
-A Device has `id`, `name`, `device_type`, `status`, and `created_at`. A Location has `id`, `device_id`, `latitude`, `longitude`, `speed`, `accuracy`, and `recorded_at`. A Trip has `id`, `device_id`, `started_at`, `ended_at`, and `status`.
+A User has `id`, `name`, `email`, `password_hash`, `role`, and `created_at`. A Setting has `key` and `value`. A Device has `id`, `name`, `device_type`, `status`, and `created_at`. A Location has `id`, `device_id`, `latitude`, `longitude`, `speed`, `accuracy`, and `recorded_at`. A Trip has `id`, `device_id`, `started_at`, `ended_at`, and `status`.
 
 The `id` fields uniquely identify records. `latitude` and `longitude` represent position. `speed` represents speed in kilometres per hour in the client payload. `accuracy` represents the approximate accuracy reported by the browser in metres. ISO-formatted timestamps provide a consistent representation of time.
 
@@ -508,11 +537,25 @@ The `id` fields uniquely identify records. `latitude` and `longitude` represent 
 
 ### 4.7.4 Physical model
 
-The physical model is implemented in SQLite. The database contains the tables `devices`, `locations`, and `trips`. The `devices`, `locations`, and `trips` identifiers are integer primary keys generated automatically. The fields that store names, types, statuses, and timestamps use text values. Geographic measurements use real-number fields.
+The physical model is implemented in SQLite. The database contains the tables `users`, `settings`, `devices`, `locations`, and `trips`. The `users`, `devices`, `locations`, and `trips` identifiers are integer primary keys generated automatically. The fields that store names, emails, roles, types, statuses, configuration values, and timestamps use text values. Passwords are stored as scrypt-derived hashes rather than plain text. Geographic measurements use real-number fields.
 
 The physical schema also creates an index on `(device_id, recorded_at DESC)` in the locations table. This index supports the common query that retrieves recent location points for a selected device. Foreign-key enforcement is enabled. The standalone implementation schema is included in `docs/database-schema.sql`.
 
 ```sql
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE devices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -546,18 +589,30 @@ CREATE TABLE trips (
 
 The logical model can be represented as follows:
 
+`USERS (id, name, email, password_hash, role, created_at)`
+
+`SETTINGS (key, value)`
+
 `DEVICES (id, name, device_type, status, created_at)`
 
 `LOCATIONS (id, device_id, latitude, longitude, speed, accuracy, recorded_at)`
 
 `TRIPS (id, device_id, started_at, ended_at, status)`
 
-The primary key of `DEVICES` is `id`. The primary key of `LOCATIONS` is `id`, and `device_id` is a foreign key referencing `DEVICES.id`. The primary key of `TRIPS` is `id`, and `device_id` is a foreign key referencing `DEVICES.id`. The logical model is normalized sufficiently for the implemented system because device details are not repeated in location or trip rows and each field stores one principal value.
+The primary key of `USERS` is `id`, with a case-insensitive unique constraint on `email`. The primary key of `SETTINGS` is `key`. The primary key of `DEVICES` is `id`. The primary key of `LOCATIONS` is `id`, and `device_id` is a foreign key referencing `DEVICES.id`. The primary key of `TRIPS` is `id`, and `device_id` is a foreign key referencing `DEVICES.id`. The logical model is normalized sufficiently for the implemented system because account and device details are not repeated in location or trip rows and each field stores one principal value.
 
 ### 4.7.6 Data dictionary
 
 | Entity | Attribute | Data type | Key or rule | Description |
 |---|---|---|---|---|
+| User | id | INTEGER | Primary key, auto-increment | Unique account identifier |
+| User | name | TEXT | Required | Account holder’s display name |
+| User | email | TEXT | Required, unique, case-insensitive | Sign-in and account identifier |
+| User | password_hash | TEXT | Required | Scrypt-derived password representation |
+| User | role | TEXT | Admin or viewer | Authorization level |
+| User | created_at | TEXT | Default timestamp | Account creation time |
+| Setting | key | TEXT | Primary key | Configuration name |
+| Setting | value | TEXT | Required | Configuration value, including the session secret |
 | Device | id | INTEGER | Primary key, auto-increment | Unique identifier of a tracker |
 | Device | name | TEXT | Required | Human-readable tracker name |
 | Device | device_type | TEXT | Default: smartphone | Type of tracking device |
@@ -576,6 +631,26 @@ The primary key of `DEVICES` is `id`. The primary key of `LOCATIONS` is `id`, an
 | Trip | ended_at | TEXT | Optional | Time at which the trip ended |
 | Trip | status | TEXT | Active or completed | Current state of the trip |
 
+### 4.7.7 Supporting design diagrams
+
+The architecture diagram shows the separation between browser clients, the Express application server, REST routes, and SQLite storage. The sequence diagram traces a location update from the phone browser to the database and back to the dashboard. The activity diagram presents the tracking workflow, while the deployment diagram shows local and managed-host operation.
+
+![System architecture diagram](rendered/system-architecture.png)
+
+*Figure 4.5: Three-tier system architecture of the GPS location tracking and management system.*
+
+![Location-update sequence diagram](rendered/sequence-location-update.png)
+
+*Figure 4.6: Sequence of a smartphone location update.*
+
+![Tracking activity diagram](rendered/activity-tracking.png)
+
+*Figure 4.7: Activity flow for starting tracking, sending positions, and ending a trip.*
+
+![Deployment diagram](rendered/deployment.png)
+
+*Figure 4.8: Deployment view for local and hosted operation.*
+
 **Sources cited in this draft:** [1] Nyanza District, “About Nyanza District,” official district website, https://www.nyanza.gov.rw/en/district/about-the-district. [2] Ministry of Infrastructure, Rwanda, “Transport,” https://www.mininfra.gov.rw/1/transport. [3] University of Lay Adventists of Kigali, “UNILAK Profile,” https://site.unilak.ac.rw/elementor-1875/.
 
 
@@ -583,9 +658,9 @@ The primary key of `DEVICES` is `id`. The primary key of `LOCATIONS` is `id`, an
 
 ## 5.1 Introduction
 
-This chapter describes the implementation of the new web-based GPS location tracking and management system. The implementation translates the requirements and designs presented in Chapter Four into a working application that can be run through a web browser. The system is implemented as a client-server information system comprising a management dashboard, a smartphone tracker interface, an application server, a REST API, and a relational database.
+This chapter describes the implementation of the working web-based GPS location tracking and management system. The implementation translates the analysis and design presented in Chapter Four into an operational client-server application. The final system comprises a first-run account setup and authentication module, an administrator and viewer access model, a management dashboard, a smartphone tracker interface, an Express application server, a REST API, SQLite persistence, interactive mapping, route history, and trip reporting.
 
-The implementation was guided by the principle of keeping the system accessible and practical for Nyanza District operations. A smartphone is used as the GPS tracking device, while the manager uses a computer or another browser-enabled device to monitor registered trackers. This arrangement allows the system to be used without purchasing a dedicated GPS unit or owning a car during demonstrations and normal operational use.
+The system remains practical for Nyanza District because a smartphone can act as the tracking device. A manager can monitor the system from a browser while a field user carries the phone and grants location permission. The implementation was maintained in the GitHub repository and the working interface was captured in the screenshots stored in the repository's `screenshots` directory.
 
 ## 5.2 Implementation environment
 
@@ -593,115 +668,173 @@ The system was implemented using the following software and technologies:
 
 | Component | Technology used | Implementation purpose |
 |---|---|---|
-| Client interface | HTML5, CSS3 and JavaScript | Dashboard and smartphone tracker pages |
+| Client interface | HTML5, CSS3 and JavaScript | Login, dashboard, tracker, tables and feedback |
 | Server runtime | Node.js | Execution environment for the application server |
-| Web framework | Express.js | HTTP server, routing and REST API |
-| Database | SQLite | Persistent storage of devices, locations and trips |
-| Mapping library | Leaflet.js | Interactive map markers and route visualization |
-| Map data | OpenStreetMap | Base map tiles for the monitoring dashboard |
+| Web framework | Express.js | HTTP server, routing, authentication endpoints and REST API |
+| Database | SQLite through better-sqlite3 | Persistent storage of accounts, devices, locations, trips and settings |
+| Password security | Node.js `crypto.scryptSync` | Salted password hashing and verification |
+| Session security | HMAC-SHA256 signed cookie | Seven-day authenticated browser session |
+| Mapping library | Leaflet.js | Interactive map markers, labels and route visualization |
+| Map data | OpenStreetMap | Base map tiles for monitoring |
 | Data format | JSON | Communication between browser clients and the REST API |
-| Version control | Git and GitHub | Source-code management and release storage |
+| Version control | Git and GitHub | Source-code management, releases and thesis evidence |
+| Deployment | Docker-compatible Node.js host | Public HTTPS operation and phone geolocation access |
 
-The application is started using the Node Package Manager scripts defined in `package.json`. The server listens on the configured application port and serves the dashboard, phone tracker page, stylesheets, client scripts, route manifest, and REST API from one application origin.
-
-The source code, implementation documentation, and release package are maintained in the GitHub repository at https://github.com/MiracleCodez/gps-system. The application can be operated locally for development or deployed to a managed web host that supports a Node.js server and persistent database storage.
+The application is started through the Node Package Manager scripts in `package.json`. The server listens on the configured port, serves the pages and styles in `public`, and exposes the REST API from the same origin. The recovery utility `scripts/create-admin.js` can create an administrator or reset an existing administrator password without storing the password in the source code.
 
 ## 5.3 Server-side implementation
 
-The server-side implementation is contained in `server.js`. Express is configured to serve the static files in the `public` directory and to expose the REST endpoints required by the two browser interfaces. The server also initializes the SQLite database when the application starts. Database tables are created only when they do not already exist, which allows existing records to remain available after a restart.
+The server-side implementation is contained in `server.js`. Express serves static resources and defines the authentication, dashboard, location, and trip routes. At startup, the application creates missing SQLite tables and indexes without deleting existing data. It also seeds a demo tracker and sample points when the device table is empty so that the dashboard can be demonstrated before a physical phone is connected.
 
-The server performs four main responsibilities. First, it serves the web pages and static client resources. Second, it receives and validates API requests. Third, it writes and reads devices, locations, and trips in SQLite. Fourth, it provides JSON responses that allow the dashboard and phone tracker to update their interfaces.
+The server validates account fields, email format, password length, device identifiers, and coordinate ranges. Parameterized SQL statements are used for database writes and reads. The `requireAuth` middleware protects the dashboard, device list, location-history, and trip-reporting endpoints. The `requireAdmin` middleware protects tracker registration, so a read-only viewer can inspect information without changing the fleet registry.
 
-The server uses parameterized SQL statements for database operations. This prevents user-provided values from being inserted directly into SQL command strings. It also validates required fields, checks that a referenced tracker exists, and verifies that latitude and longitude values are within valid geographic ranges.
+## 5.4 Account registration and authentication implementation
 
-## 5.4 REST API implementation
+The final application implements a local account module. On the first run, `/login` displays the **Create admin account** form. The first user provides a name, email, password, and confirmation password. The server permits this setup only while the `users` table is empty and assigns the first account the `admin` role.
 
-The REST API provides a communication layer between the browser clients and the server. The implemented endpoints are as follows:
+After the first administrator exists, the same page becomes a normal sign-in page and provides a viewer-account registration option. New public registrations are assigned the `viewer` role. Administrators can register trackers, while viewers can access authenticated monitoring functions without receiving the tracker-creation permission. The legacy `/auth/login` path redirects to `/login` so previously shared links remain usable.
 
-| Method | Endpoint | Implementation function |
+Passwords are never stored as plain text. The server generates a random salt, derives a 64-byte password hash using `scrypt`, and stores the representation in the `password_hash` field. During login, the entered password is derived with the stored salt and compared with a timing-safe comparison. After successful authentication, the server creates a signed `gps_session` cookie containing the user identifier and an expiry time seven days in the future. The server validates the signature and expiry on each protected request.
+
+The login endpoint applies temporary brute-force protection. Eight failed attempts from the same network address within ten minutes cause the endpoint to return HTTP 429 until the temporary window expires. The `scripts/create-admin.js` utility supports recovery by creating an administrator or updating an existing administrator password. The sign-in interface presents validation errors for incorrect credentials, duplicate emails, mismatched passwords, and temporary lockout.
+
+## 5.5 REST API implementation
+
+The REST API provides communication between the login page, dashboard, smartphone tracker, and server:
+
+| Method | Endpoint | Access and implementation function |
 |---|---|---|
-| GET | `/api/health` | Reports whether the server is available |
-| GET | `/api/devices` | Returns registered trackers and their latest location information |
-| POST | `/api/devices` | Creates a new tracker record |
-| GET | `/api/devices/:id/locations` | Returns ordered location history for one tracker |
-| POST | `/api/locations` | Validates and stores a GPS location observation |
+| GET | `/api/health` | Public health check for deployment readiness |
+| GET | `/api/auth/status` | Reports whether setup is required and whether the browser is authenticated |
+| POST | `/api/auth/setup` | Creates the first administrator account |
+| POST | `/api/auth/register` | Creates a read-only viewer account after setup |
+| POST | `/api/auth/login` | Verifies credentials and creates a session |
+| POST/GET | `/api/auth/logout` or `/auth/logout` | Clears the current session |
+| GET | `/api/session` | Returns the authenticated user and role |
+| GET | `/api/devices` | Authenticated list of trackers and latest locations |
+| POST | `/api/devices` | Administrator-only tracker registration |
+| GET | `/api/devices/:id/locations` | Authenticated location history for one tracker |
+| POST | `/api/locations` | Stores a phone GPS update after coordinate validation |
 | POST | `/api/trips/start` | Creates an active trip for a tracker |
-| POST | `/api/trips/end` | Completes the active trip for a tracker |
-| GET | `/api/trips` | Returns recent trip records |
+| POST | `/api/trips/end` | Completes the active trip |
+| GET | `/api/trips` | Returns authenticated trip reports with duration, distance, points and status |
 
-When a phone submits a location, the request contains a device identifier, latitude, longitude, speed, accuracy, and recorded time. The server verifies the device identifier and coordinate values before storing the observation. A successful request returns a JSON response confirming that the location was recorded.
+When a phone submits a location, the request contains a device identifier, latitude, longitude, speed, accuracy, and the server-generated recording time. The server verifies the device and coordinate ranges before storing the observation. A successful response confirms that the point was recorded and updates the device status to online.
 
-The device-list endpoint returns the registered devices together with recent status and latest-location information. The dashboard uses this endpoint to populate the tracker list, map markers, status labels, and telemetry panel. The location-history endpoint returns records in time order so that the client can display a route line and a history table.
+## 5.6 Database implementation
 
-Trip endpoints provide a clear beginning and ending for a movement activity. The start endpoint creates a record with active status. The end endpoint records the end time and changes the status to completed. This implementation allows management records to distinguish an active journey from a completed journey.
+The final database implementation contains five tables: `users`, `settings`, `devices`, `locations`, and `trips`. The `users` table stores account identity, scrypt password representation, role, and creation time. The `settings` table stores application configuration, including a generated session secret when one is not supplied through the environment. The operational tables preserve tracker identity, coordinate observations, and trip periods.
 
-## 5.5 Database implementation
+The one-to-many relationships defined in Chapter Four are implemented through foreign keys. A device can have many location observations and many trips. Each location and trip belongs to one device. The index on `(device_id, recorded_at DESC)` supports the dashboard query for recent tracker history. SQLite is appropriate for the current BSc deployment because it is lightweight and simple to install; a larger multi-department deployment could migrate the logical model to PostgreSQL or another server database.
 
-The database implementation uses SQLite and consists of three related tables: `devices`, `locations`, and `trips`. The `devices` table stores the identity and status of each tracker. The `locations` table stores coordinate observations. The `trips` table stores journey periods.
+## 5.7 Dashboard implementation
 
-The one-to-many relationships defined in Chapter Four are implemented through foreign keys. A device can have many location observations and many trips. Each location and trip belongs to one device. An index on device identifier and recorded time supports the retrieval of recent location history.
+The management dashboard is implemented in `public/index.html`, `public/app.js`, and `public/styles.css`. It is opened only after successful authentication and displays the signed-in user and role in the header. It contains the following modules:
 
-The database is suitable for the current system because it is lightweight, easy to install, and able to preserve records in a local database file. For an expanded multi-department deployment, the same logical model can be migrated to a server database such as PostgreSQL with spatial extensions. Such a migration would preserve the main entities while providing stronger concurrency and spatial-query capabilities.
+1. **Account context:** shows the authenticated name and role and provides sign-out.
+2. **Tracker registration:** administrators can add a tracker name and device type; viewers do not receive this control.
+3. **Fleet registry:** registered trackers are displayed with device type, last-seen time, selected state, and online/offline status.
+4. **Live map:** latest tracker positions are shown as colour-coded markers with permanent labels.
+5. **Telemetry panel:** the selected tracker displays latitude, longitude, speed, status, device type, creation time, and last-seen information.
+6. **Route history:** stored observations are shown as a route line and a tabular list of recorded points.
+7. **Trip reporting:** recent trips are shown with tracker, start time, end time, duration, calculated distance, point count, and active/completed status.
+8. **Automatic refresh:** device and trip information refreshes periodically so new phone submissions appear without a full page reload.
 
-## 5.6 Dashboard implementation
+The later GUI update adds a stable colour from a palette to each tracker, a visible label for each map marker, a highlighted selected marker, and more prominent trip reporting. These details improve interpretation when several trackers are visible at the same time.
 
-The management dashboard is implemented in `public/index.html`, `public/app.js`, and `public/styles.css`. It is designed for the administrator or fleet manager. The dashboard contains the following functional areas:
+## 5.8 Smartphone tracker implementation
 
-1. **Tracker registration:** A manager enters a tracker name and device type. The form sends a request to the device-creation endpoint.
-2. **Tracker list:** Registered trackers are displayed with their current status and most recent activity.
-3. **Interactive map:** Latest tracker locations are represented as map markers. Selecting a tracker updates the map and telemetry panel.
-4. **Telemetry panel:** The dashboard displays latitude, longitude, speed, accuracy, and last-seen time for the selected tracker.
-5. **Route history:** Stored location points are requested from the server and represented as a route line and history records.
-6. **Trip information:** The dashboard provides access to recorded trips and their active or completed status.
+The smartphone tracker is implemented in `public/tracker.html` and `public/tracker.js`. When a user opens the page without a valid session, the page detects the unauthorized device-list response and redirects to `/login`. After authentication, the tracker page loads the first registered tracker and displays its identifier and device type.
 
-The dashboard refreshes recent device information periodically. This allows a manager to view new location submissions without repeatedly refreshing the entire page. Error messages are displayed when the server cannot be reached or when an API request is rejected.
+When tracking starts, the browser requests location permission through the Geolocation API. After permission is granted, the page watches for position changes, extracts latitude, longitude, speed, and accuracy, and sends the data to `/api/locations`. The page presents the latest coordinates, accuracy, update count, connection status, and feedback message. The user can start and end a trip from the same page. Physical-phone operation requires HTTPS or localhost permission, and the screenshots show both the permission prompt and a successful online update.
 
-## 5.7 Smartphone tracker implementation
+## 5.9 Trip reporting and distance calculation
 
-The smartphone tracker is implemented in `public/tracker.html`, `public/tracker.js`, and the shared stylesheet. A user opens the tracker page on a smartphone and selects a registered tracker. When tracking is started, the browser requests permission to access location information through the Geolocation API.
+Trip reporting was extended beyond simple start and end timestamps. The server retrieves the location points recorded between a trip’s start and end times. It applies the Haversine formula to consecutive coordinate pairs to estimate travelled distance in kilometres. The API returns the trip record together with the number of points and rounded distance.
 
-After permission is granted, the browser watches for position changes. Each position object is converted into the system’s location payload. The implementation extracts latitude, longitude, speed, accuracy, and time, then sends the payload to `/api/locations`. The page reports the latest coordinate, estimated accuracy, and number of successful updates so that the user can see whether tracking is active.
+The dashboard calculates a human-readable duration from the start and end times and displays distance, point count, and status in the recent-trips table. An active trip has no end time and its duration is calculated up to the current time. A completed trip displays its stored end time and final calculated values. This module gives the manager an operational summary instead of requiring manual interpretation of the route table.
 
-The same page provides start-trip and end-trip controls. Starting a trip sends the selected device identifier to the trip-start endpoint. Ending a trip sends the identifier to the trip-end endpoint. The interface informs the user when permission is denied, when the phone cannot obtain a position, or when the server cannot receive an update.
+## 5.10 Map and route implementation
 
-For normal use, the phone should remain connected to the internet and the tracker page should remain active. The browser must be allowed to use location services. When using a physical phone outside localhost, the deployed website should use HTTPS because modern browsers restrict geolocation on insecure origins.
+The mapping component uses Leaflet and OpenStreetMap. The dashboard creates a marker for each tracker with a location, assigns a stable palette colour, attaches the tracker name as a visible label, and updates the marker when a new location arrives. Selecting a tracker changes the marker emphasis and opens the corresponding telemetry and route history.
 
-## 5.8 Map and route implementation
+For route history, the dashboard converts ordered location records into coordinate pairs and draws a polyline through them. The map is fitted to the available route when appropriate. The map remains a presentation layer, while the server and SQLite database preserve the observations. This separation allows the map library or storage engine to be replaced later without changing the essential tracker workflow.
 
-The mapping component uses Leaflet to create an interactive map. OpenStreetMap tiles provide the background map. When the dashboard receives a latest location, it creates or updates a marker for the selected tracker. The marker popup identifies the tracker and provides its latest position information.
-
-For route history, the dashboard converts the ordered location records into coordinate pairs. Leaflet then draws a polyline through those points. The map is fitted to the available route so that the manager can view the movement area. The route is based on stored GPS observations and therefore becomes more detailed as the tracker submits additional points.
-
-The map implementation separates presentation from storage. Leaflet and OpenStreetMap display the data, while the server and SQLite database remain responsible for preserving the location records. This separation allows a future mapping library or spatial database to be introduced without changing the fundamental tracker workflow.
-
-## 5.9 Application workflow
+## 5.11 Application workflow
 
 The complete operational workflow is implemented as follows:
 
-1. The manager opens the dashboard and registers a tracker.
-2. The system stores the tracker in the devices table.
-3. The user opens the phone tracker page and selects the registered tracker.
-4. The user grants browser location permission and starts tracking.
-5. The smartphone obtains a position and sends a JSON location request.
-6. The server validates the device and coordinates.
-7. The server stores the location in the locations table and updates the tracker activity.
-8. The dashboard refreshes and displays the latest marker and telemetry.
-9. The user starts a trip when a journey begins and ends it when the journey is complete.
-10. The manager selects a tracker to view its route history and trip information.
+1. The user opens `/login`.
+2. If no account exists, the user creates the first administrator account; otherwise the user signs in or creates a viewer account.
+3. The server hashes the password, creates a signed seven-day session, and redirects the user to the dashboard.
+4. The administrator registers a tracker; a viewer can inspect trackers but cannot add one.
+5. The phone user opens `/tracker.html` and grants location permission.
+6. The smartphone obtains a position and sends a JSON location request.
+7. The server validates the device and coordinates, stores the observation, and updates the tracker status.
+8. The dashboard refreshes and displays the latest marker, label, telemetry, and route history.
+9. The phone user starts and ends a trip.
+10. The server calculates trip duration, distance, and point count for the authenticated reporting view.
+11. The manager selects a tracker to inspect its history and recent trip records.
 
-This workflow connects the requirements, system diagrams, database model, and user interfaces. It also allows the system to be used with a walking smartphone user when a vehicle is not available.
+This workflow connects the requirements, authentication module, database model, system diagrams, and user interfaces. It also permits demonstration with a walking smartphone user when a vehicle is not available.
 
-## 5.10 Deployment and operation
+## 5.12 Deployment and operation
 
-The application is maintained in the GitHub repository `MiracleCodez/gps-system`. For local operation, the user installs the Node.js dependencies, starts the server, and opens the dashboard in a browser. For online operation, the project requires a hosting environment that supports a Node.js server, environment configuration, public HTTPS access, and persistent database storage.
+The application is maintained in the GitHub repository `MiracleCodez/gps-system`. Local operation requires Node.js, dependency installation with `npm install`, and startup with `npm start`. The first-run setup is completed at `http://localhost:3000/login`. If an administrator forgets the password, the documented recovery command is:
 
-The operational URL should be used for the dashboard and the `/tracker.html` page. The manager shares the tracker page URL with an authorized phone user. The phone user must grant location permission and keep the page available during tracking. The manager uses the dashboard URL to monitor the latest location and review the stored history.
+```bash
+node scripts/create-admin.js "Your Name" you@email.com "NewPassword"
+```
 
-Deployment should include a health endpoint, server logs, database backup, and a documented restart procedure. The system should also be protected through HTTPS and access restrictions before real personal or vehicle location data is collected. These operational controls support the use of the implemented system while acknowledging the responsibilities associated with location information.
+For hosted operation, the project uses a Docker-compatible Node.js environment, public HTTPS, a health endpoint, and persistent database storage. HTTPS is important because modern browsers restrict geolocation on insecure origins. The deployment should include database backup, server logs, secret management, and a documented restart procedure before real location data is collected.
 
-## 5.11 Implementation summary
+## 5.13 Working-system screenshots
 
-The new system has been implemented as a working web application with a dashboard, smartphone tracker page, REST API, relational database, map visualization, route history, and trip management. The implementation directly reflects the design presented in Chapter Four. It can be used with a smartphone in place of a dedicated GPS device and can be expanded later with authentication, roles, geofencing, alerts, offline buffering, and advanced spatial analysis.
+The following figures were captured from the working application and committed to the repository in the `screenshots` directory. They provide implementation evidence for the authentication, dashboard, map, history, and smartphone tracking modules.
+
+![First-run administrator account setup](screenshots/screenshot-01-first-run.png)
+
+*Figure 5.1: First-run administrator account setup screen showing name, email, password, and confirmation fields.*
+
+![Authenticated dashboard](screenshots/screenshot-02-dashboard.png)
+
+*Figure 5.2: Authenticated management dashboard showing the live map, fleet registry, selected tracker, and route-history area.*
+
+![Live dashboard map](screenshots/screenshot-03-live-map.png)
+
+*Figure 5.3: Dashboard map displaying current tracker markers and selected-tracker telemetry.*
+
+![Route history table](screenshots/screenshot-04-route-history.png)
+
+*Figure 5.4: Route-history table showing recorded timestamps, coordinates, speed, and accuracy.*
+
+![Location permission prompt](screenshots/screenshot-05-permission.png)
+
+*Figure 5.5: Smartphone tracker interface requesting permission to use the phone’s location.*
+
+![Online smartphone tracker](screenshots/screenshot-06-tracker-online.png)
+
+*Figure 5.6: Smartphone tracker after permission is granted and location updates are being sent successfully.*
+
+![Wide map view](screenshots/screenshot-07-wide-map.png)
+
+*Figure 5.7: Wide dashboard map view showing the monitoring area and multiple tracker points.*
+
+![Selected tracker dashboard](screenshots/screenshot-08-selected-tracker.png)
+
+*Figure 5.8: Dashboard with the Samsung tracker selected, showing its device type, position, status, and history.*
+
+![Sign-in error](screenshots/screenshot-09-sign-in-error.png)
+
+*Figure 5.9: Sign-in validation feedback after an incorrect email or password.*
+
+![Additional dashboard view](screenshots/ss2.png)
+
+*Figure 5.10: Additional authenticated dashboard view showing the live map, tracker list, telemetry, and recent location points.*
+
+## 5.14 Implementation summary
+
+The final system is a working authenticated web application with first-run administrator setup, viewer registration, signed sessions, scrypt password hashing, temporary login lockout, role-based tracker registration, a smartphone geolocation tracker, REST API, SQLite persistence, interactive map visualization, colour-coded tracker markers, route history, trip distance calculation, and trip reporting. The uploaded screenshots provide evidence of the implemented user interfaces and operational workflow. The system directly reflects the design presented in Chapter Four and can be demonstrated with a smartphone in place of a dedicated GPS device.
 
 # CHAPTER 6: REFERENCES
 
@@ -717,4 +850,12 @@ The new system has been implemented as a working web application with a dashboar
 
 [6] Mozilla Developer Network, “Geolocation API,” Available at: https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API. Accessed: 10 October 2026.
 
-[7] MiracleCodez, “GPS System,” GitHub repository. Available at: https://github.com/MiracleCodez/gps-system. Accessed: 13 October 2026.
+[7] MiracleCodez, “GPS System,” GitHub repository. Available at: https://github.com/MiracleCodez/gps-system. Accessed: 14 October 2026.
+
+[8] Node.js, “Crypto API,” Node.js Documentation. Available at: https://nodejs.org/api/crypto.html. Accessed: 14 October 2026.
+
+[9] Express.js, “Using middleware,” Express Documentation. Available at: https://expressjs.com/en/guide/using-middleware.html. Accessed: 14 October 2026.
+
+[10] SQLite Consortium, “SQLite Documentation,” Available at: https://www.sqlite.org/docs.html. Accessed: 14 October 2026.
+
+[11] Mozilla Developer Network, “Web Storage API and HTTP cookies,” Available at: https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies. Accessed: 14 October 2026.
