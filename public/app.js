@@ -6,7 +6,8 @@ async function loadSession() {
   if (!response.ok) throw new Error('Authentication session is unavailable.');
   const data = await response.json();
   const user = data.user || {};
-  $('#account-name').textContent = user.name || user.email || 'Signed in';
+  $('#account-name').textContent = `${user.name || user.email || 'Signed in'}${user.role ? ` (${user.role})` : ''}`;
+  if (user.role !== 'admin') { $('#show-add').classList.add('hidden'); $('#add-form').remove(); }
 }
 
 function timeAgo(iso) {
@@ -69,8 +70,8 @@ async function selectDevice(id, pan = true) {
   if (state.route) state.map.removeLayer(state.route);
   if (locations.length > 1) { state.route = L.polyline(locations.map((p) => [p.latitude, p.longitude]), { color: '#78e6bf', weight: 3, opacity: .85, dashArray: '5 8' }).addTo(state.map); if (pan) state.map.fitBounds(state.route.getBounds(), { padding: [45, 45], maxZoom: 16 }); }
 }
-$('#show-add').addEventListener('click', () => $('#add-form').classList.toggle('hidden'));
-$('#add-form').addEventListener('submit', async (event) => { event.preventDefault(); const name = $('#device-name').value.trim(); if (!name) return; const response = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, deviceType: $('#device-type').value }) }); if (response.ok) { $('#device-name').value = ''; $('#add-form').classList.add('hidden'); await loadDevices(); } });
+$('#show-add').addEventListener('click', () => $('#add-form')?.classList.toggle('hidden'));
+$('#add-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const name = $('#device-name').value.trim(); if (!name) return; const response = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, deviceType: $('#device-type').value }) }); if (response.ok) { $('#device-name').value = ''; $('#add-form').classList.add('hidden'); await loadDevices(); } });
 setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString(); }, 1000);
 initMap(); Promise.all([loadSession(), loadDevices()]).catch((error) => { console.error(error); $('#device-list').innerHTML = '<div class="empty-state">Could not load the authenticated dashboard.</div>'; });
 setInterval(() => loadDevices().catch(console.error), 10000);

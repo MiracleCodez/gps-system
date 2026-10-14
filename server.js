@@ -106,6 +106,11 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Administrator access required.' });
+  next();
+}
+
 // Basic brute-force protection: 8 failed attempts per IP per 10 minutes.
 const failedLogins = new Map();
 function tooManyAttempts(ip) {
@@ -179,6 +184,22 @@ app.post('/api/auth/setup', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+// Public self-registration: creates a read-only 'viewer' account (only after the first admin exists).
+const registrations = new Map();
+app.post('/api/auth/register', (req, res) => {
+  if (!hasUsers()) return res.status(403).json({ error: 'No administrator exists yet. Complete first-time setup first.' });
+  const entry = registrations.get(req.ip);
+  if (entry && Date.now() - entry.first < 3600000 && entry.count >= 5) return res.status(429).json({ error: 'Too many sign-ups from this network. Please try again later.' });
+  const account = { name: String(req.body?.name || '').trim(), email: String(req.body?.email || '').trim().toLowerCase(), password: String(req.body?.password || '') };
+  const problem = validateAccount(account);
+  if (problem) return res.status(400).json({ error: problem });
+  if (db.prepare('SELECT id FROM users WHERE email = ?').get(account.email)) return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+  const result = db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'viewer')").run(account.name, account.email, hashPassword(account.password));
+  if (!entry || Date.now() - entry.first >= 3600000) registrations.set(req.ip, { count: 1, first: Date.now() }); else entry.count += 1;
+  res.setHeader('Set-Cookie', cookieHeader(req, createSessionToken({ id: result.lastInsertRowid })));
+  res.status(201).json({ ok: true });
+});
+
 app.post('/api/auth/login', (req, res) => {
   if (tooManyAttempts(req.ip)) return res.status(429).json({ error: 'Too many failed attempts. Please wait a few minutes and try again.' });
   const email = String(req.body?.email || '').trim().toLowerCase();
@@ -222,7 +243,7 @@ function normalizeDevice(row) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'gps-system', time: new Date().toISOString() }));
 app.get('/api/devices', requireAuth, (_req, res) => res.json(db.prepare('SELECT * FROM devices ORDER BY id ASC').all().map(normalizeDevice)));
-app.post('/api/devices', requireAuth, (req, res) => {
+app.post('/api/devices', requireAuth, requireAdmin, (req, res) => {
   const name = String(req.body?.name || '').trim();
   const deviceType = String(req.body?.deviceType || 'smartphone').trim();
   if (!name) return res.status(400).json({ error: 'Device name is required.' });

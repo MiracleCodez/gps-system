@@ -35,11 +35,13 @@
         <label id="confirm-field" class="hidden">Confirm password<input id="confirm" type="password" autocomplete="new-password" minlength="8"></label>
         <button id="submit" class="button button-primary" type="submit">Continue</button>
       </form>
+      <p id="switch-wrap" class="fine-print" style="text-align:center;margin-top:16px"><span id="switch-text"></span> <a id="switch-link" href="#" style="color:var(--mint);font-weight:700"></a></p>
     </section>
   </main>
   <script>
     const $ = (s) => document.querySelector(s);
     let setupMode = false;
+    let registerMode = false;
 
     function show(text, tone) {
       const box = $('#auth-message');
@@ -47,29 +49,42 @@
       box.className = `notice ${tone || ''}`;
     }
 
+    function render() {
+      const needName = setupMode || registerMode;
+      $('#auth-eyebrow').textContent = setupMode ? 'First-time setup' : registerMode ? 'Create account' : 'Sign in';
+      $('#auth-lede').textContent = setupMode
+        ? 'No account exists yet. Create the administrator account for this system.'
+        : registerMode
+          ? 'Create a viewer account to see trackers and routes. Administrators manage trackers.'
+          : 'Sign in to open the operations console.';
+      $('#name-field').classList.toggle('hidden', !needName);
+      $('#confirm-field').classList.toggle('hidden', !needName);
+      $('#name').required = needName;
+      $('#confirm').required = needName;
+      $('#password').autocomplete = needName ? 'new-password' : 'current-password';
+      $('#submit').textContent = setupMode ? 'Create admin account' : registerMode ? 'Create account' : 'Sign in';
+      $('#switch-wrap').classList.toggle('hidden', setupMode);
+      $('#switch-text').textContent = registerMode ? 'Already have an account?' : 'No account yet?';
+      $('#switch-link').textContent = registerMode ? 'Sign in' : 'Create one';
+      $('#auth-message').className = 'notice hidden';
+    }
+
     async function init() {
       const status = await (await fetch('/api/auth/status')).json();
       if (status.authenticated) return location.replace('/');
       setupMode = status.setupRequired;
-      $('#auth-eyebrow').textContent = setupMode ? 'First-time setup' : 'Admin sign in';
-      $('#auth-lede').textContent = setupMode
-        ? 'No account exists yet. Create the administrator account for this system.'
-        : 'Sign in to open the operations console.';
-      $('#name-field').classList.toggle('hidden', !setupMode);
-      $('#confirm-field').classList.toggle('hidden', !setupMode);
-      $('#name').required = setupMode;
-      $('#confirm').required = setupMode;
-      $('#password').autocomplete = setupMode ? 'new-password' : 'current-password';
-      $('#submit').textContent = setupMode ? 'Create admin account' : 'Sign in';
+      render();
     }
+
+    $('#switch-link').addEventListener('click', (event) => { event.preventDefault(); registerMode = !registerMode; render(); });
 
     $('#auth-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       const password = $('#password').value;
-      if (setupMode && password !== $('#confirm').value) return show('Passwords do not match.', 'error');
+      if ((setupMode || registerMode) && password !== $('#confirm').value) return show('Passwords do not match.', 'error');
       $('#submit').disabled = true;
       try {
-        const response = await fetch(setupMode ? '/api/auth/setup' : '/api/auth/login', {
+        const response = await fetch(setupMode ? '/api/auth/setup' : registerMode ? '/api/auth/register' : '/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: $('#name').value, email: $('#email').value, password })
