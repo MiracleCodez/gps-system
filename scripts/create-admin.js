@@ -22,8 +22,8 @@ const hash = `scrypt$${salt.toString('hex')}$${crypto.scryptSync(password, salt,
 const email = emailRaw.trim().toLowerCase();
 const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
 if (existing) {
-  db.prepare('UPDATE users SET name = ?, password_hash = ? WHERE id = ?').run(name, hash, existing.id);
-  console.log(`Password updated for ${email}`);
+  db.prepare('UPDATE users SET name = ?, password_hash = ?, role = \'admin\' WHERE id = ?').run(name, hash, existing.id);
+  console.log(`${email} is now an admin (password updated)`);
 } else {
   db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')").run(name, email, hash);
   console.log(`Admin created: ${email}`);
