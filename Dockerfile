@@ -11,6 +11,7 @@ RUN npm ci --omit=dev
 
 COPY server.js ./
 COPY public ./public
+COPY scripts ./scripts
 COPY .env.example ./.env.example
 
 ENV NODE_ENV=production
