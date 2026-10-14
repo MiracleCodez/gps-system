@@ -11,47 +11,70 @@ const db = new Database(process.env.DB_FILE || path.join(__dirname, 'gps.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const SESSION_COOKIE = 'webdev_app_session';
-const STATE_COOKIE = 'gps_oauth_state';
+const SESSION_COOKIE = 'gps_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
-function base64Url(value) {
-  return Buffer.from(value).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+app.set('trust proxy', 1);
+
+// ---------- Local account system (no third-party login needed) ----------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+`);
+
+// Session secret: use SESSION_SECRET from .env, otherwise generate one once and keep it in the database.
+function getSessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'session_secret'").get();
+  if (row) return row.value;
+  const secret = crypto.randomBytes(48).toString('hex');
+  db.prepare("INSERT INTO settings (key, value) VALUES ('session_secret', ?)").run(secret);
+  return secret;
+}
+const SESSION_SECRET = getSessionSecret();
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password, salt, 64);
+  return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`;
 }
 
-function base64UrlJson(value) {
-  return base64Url(JSON.stringify(value));
+function verifyPassword(password, stored) {
+  const [scheme, saltHex, hashHex] = String(stored).split('$');
+  if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return crypto.timingSafeEqual(expected, actual);
 }
 
-function decodeBase64Url(value) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  return Buffer.from(normalized + '='.repeat((4 - normalized.length % 4) % 4), 'base64').toString('utf8');
+function sign(value) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
 }
 
-function signSession(payload) {
-  const secret = process.env.MANUS_JWT_SECRET;
-  if (!secret || !process.env.MANUS_PROJECT_ID) throw new Error('Manus authentication environment is not configured.');
-  const header = base64UrlJson({ alg: 'HS256', typ: 'JWT' });
-  const body = base64UrlJson(payload);
-  const signature = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
-  return `${header}.${body}.${signature}`;
+function createSessionToken(user) {
+  const payload = Buffer.from(JSON.stringify({ uid: user.id, exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE })).toString('base64url');
+  return `${payload}.${sign(payload)}`;
 }
 
-function verifySession(token) {
-  const secret = process.env.MANUS_JWT_SECRET;
-  if (!secret || !token) return null;
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const expected = crypto.createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
-  const expectedBuffer = Buffer.from(expected);
-  const actualBuffer = Buffer.from(parts[2]);
-  if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) return null;
+function currentUser(req) {
+  const token = parseCookies(req)[SESSION_COOKIE];
+  if (!token) return null;
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(sign(payload));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
   try {
-    const header = JSON.parse(decodeBase64Url(parts[0]));
-    const payload = JSON.parse(decodeBase64Url(parts[1]));
-    if (header.alg !== 'HS256' || payload.appId !== process.env.MANUS_PROJECT_ID) return null;
-    if (!payload.openId || (payload.exp && payload.exp < Math.floor(Date.now() / 1000))) return null;
-    return payload;
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!data.uid || data.exp < Math.floor(Date.now() / 1000)) return null;
+    return db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(data.uid) || null;
   } catch (_error) {
     return null;
   }
@@ -64,49 +87,48 @@ function parseCookies(req) {
   }));
 }
 
-function cookieHeader(name, value, maxAge = SESSION_MAX_AGE) {
-  return `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=None`;
+function cookieHeader(req, value, maxAge = SESSION_MAX_AGE) {
+  const secure = req.secure ? '; Secure' : '';
+  return `${SESSION_COOKIE}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax${secure}`;
 }
 
-function clearCookieHeader(name) {
-  return `${name}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=None`;
-}
-
-function requestOrigin(req) {
-  const protocol = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  return `${protocol}://${req.get('host')}`;
-}
-
-function currentUser(req) {
-  return verifySession(parseCookies(req)[SESSION_COOKIE]);
+function hasUsers() {
+  return db.prepare('SELECT COUNT(*) AS count FROM users').get().count > 0;
 }
 
 function requireAuth(req, res, next) {
   const user = currentUser(req);
   if (!user) {
-    if (req.path === '/' || req.path === '/index.html') return res.redirect('/auth/login');
+    if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html')) return res.redirect('/login');
     return res.status(401).json({ error: 'Authentication required.' });
   }
   req.user = user;
   next();
 }
 
-async function exchangeCode(code, redirectUri) {
-  const apiUrl = process.env.MANUS_OAUTH_API_URL;
-  const clientId = process.env.MANUS_PROJECT_ID;
-  if (!apiUrl || !clientId) throw new Error('Manus OAuth is not configured for this deployment.');
-  const tokenResponse = await fetch(`${apiUrl}/webdev.v1.WebDevAuthPublicService/ExchangeToken`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, grantType: 'authorization_code', code, redirectUri })
-  });
-  if (!tokenResponse.ok) throw new Error('The account sign-in code could not be exchanged.');
-  const token = await tokenResponse.json();
-  const userResponse = await fetch(`${apiUrl}/webdev.v1.WebDevAuthPublicService/GetUserInfo`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ accessToken: token.accessToken })
-  });
-  if (!userResponse.ok) throw new Error('The signed-in account could not be loaded.');
-  return userResponse.json();
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Administrator access required.' });
+  next();
+}
+
+// Basic brute-force protection: 8 failed attempts per IP per 10 minutes.
+const failedLogins = new Map();
+function tooManyAttempts(ip) {
+  const entry = failedLogins.get(ip);
+  if (!entry || Date.now() - entry.first > 600000) return false;
+  return entry.count >= 8;
+}
+function recordFailure(ip) {
+  const entry = failedLogins.get(ip);
+  if (!entry || Date.now() - entry.first > 600000) failedLogins.set(ip, { count: 1, first: Date.now() });
+  else entry.count += 1;
+}
+
+function validateAccount({ name, email, password }) {
+  if (!name || name.length > 80) return 'Please enter your name.';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 'Please enter a valid email address.';
+  if (password.length < 8) return 'Password must be at least 8 characters.';
+  return null;
 }
 
 db.exec(`
@@ -147,47 +169,65 @@ if (deviceCount === 0) {
 
 app.use(express.json({ limit: '32kb' }));
 
-app.get('/auth/login', (req, res) => {
-  if (currentUser(req)) return res.redirect('/');
-  if (!process.env.MANUS_OAUTH_PORTAL_URL || !process.env.MANUS_PROJECT_ID || !process.env.MANUS_JWT_SECRET) {
-    return res.status(503).send('Account sign-in is not configured for this deployment yet.');
-  }
-  const redirectUri = `${requestOrigin(req)}/manus-oauth/callback`;
-  const nonce = crypto.randomBytes(24).toString('hex');
-  const state = base64UrlJson({ redirectUri, nonce });
-  res.setHeader('Set-Cookie', cookieHeader(STATE_COOKIE, nonce, 600));
-  const url = new URL('/app-auth', process.env.MANUS_OAUTH_PORTAL_URL);
-  url.searchParams.set('appId', process.env.MANUS_PROJECT_ID);
-  url.searchParams.set('redirectUri', redirectUri);
-  url.searchParams.set('state', state);
-  url.searchParams.set('responseType', 'code');
-  res.redirect(url.toString());
+app.get('/api/auth/status', (req, res) => {
+  res.json({ setupRequired: !hasUsers(), authenticated: Boolean(currentUser(req)) });
 });
 
-app.get('/manus-oauth/callback', async (req, res) => {
-  try {
-    const state = JSON.parse(decodeBase64Url(String(req.query.state || '')));
-    const cookies = parseCookies(req);
-    if (!state.redirectUri || !state.nonce || cookies[STATE_COOKIE] !== state.nonce || !req.query.code) throw new Error('The sign-in state is invalid or expired.');
-    const user = await exchangeCode(String(req.query.code), state.redirectUri);
-    const now = Math.floor(Date.now() / 1000);
-    const session = signSession({ appId: process.env.MANUS_PROJECT_ID, openId: user.openId, name: user.name || user.email || 'Account user', email: user.email || '', iat: now, exp: now + SESSION_MAX_AGE });
-    res.setHeader('Set-Cookie', [cookieHeader(SESSION_COOKIE, session), clearCookieHeader(STATE_COOKIE)]);
-    res.redirect('/');
-  } catch (error) {
-    res.status(401).send(`<h1>Sign-in failed</h1><p>${String(error.message || 'Please try again.')}</p><p><a href="/auth/login">Return to sign in</a></p>`);
-  }
+// First-run setup: only works while no account exists, and creates the first admin.
+app.post('/api/auth/setup', (req, res) => {
+  if (hasUsers()) return res.status(403).json({ error: 'Setup is already complete. Please sign in.' });
+  const account = { name: String(req.body?.name || '').trim(), email: String(req.body?.email || '').trim().toLowerCase(), password: String(req.body?.password || '') };
+  const problem = validateAccount(account);
+  if (problem) return res.status(400).json({ error: problem });
+  const result = db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')").run(account.name, account.email, hashPassword(account.password));
+  res.setHeader('Set-Cookie', cookieHeader(req, createSessionToken({ id: result.lastInsertRowid })));
+  res.status(201).json({ ok: true });
 });
 
-app.get('/auth/logout', (_req, res) => {
-  res.setHeader('Set-Cookie', clearCookieHeader(SESSION_COOKIE));
-  res.redirect('/auth/login');
+// Public self-registration: creates a read-only 'viewer' account (only after the first admin exists).
+const registrations = new Map();
+app.post('/api/auth/register', (req, res) => {
+  if (!hasUsers()) return res.status(403).json({ error: 'No administrator exists yet. Complete first-time setup first.' });
+  const entry = registrations.get(req.ip);
+  if (entry && Date.now() - entry.first < 3600000 && entry.count >= 5) return res.status(429).json({ error: 'Too many sign-ups from this network. Please try again later.' });
+  const account = { name: String(req.body?.name || '').trim(), email: String(req.body?.email || '').trim().toLowerCase(), password: String(req.body?.password || '') };
+  const problem = validateAccount(account);
+  if (problem) return res.status(400).json({ error: problem });
+  if (db.prepare('SELECT id FROM users WHERE email = ?').get(account.email)) return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+  const result = db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'viewer')").run(account.name, account.email, hashPassword(account.password));
+  if (!entry || Date.now() - entry.first >= 3600000) registrations.set(req.ip, { count: 1, first: Date.now() }); else entry.count += 1;
+  res.setHeader('Set-Cookie', cookieHeader(req, createSessionToken({ id: result.lastInsertRowid })));
+  res.status(201).json({ ok: true });
 });
+
+app.post('/api/auth/login', (req, res) => {
+  if (tooManyAttempts(req.ip)) return res.status(429).json({ error: 'Too many failed attempts. Please wait a few minutes and try again.' });
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '');
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    recordFailure(req.ip);
+    return res.status(401).json({ error: 'Incorrect email or password.' });
+  }
+  failedLogins.delete(req.ip);
+  res.setHeader('Set-Cookie', cookieHeader(req, createSessionToken(user)));
+  res.json({ ok: true });
+});
+
+function logout(req, res) {
+  res.setHeader('Set-Cookie', cookieHeader(req, '', 0));
+}
+app.post('/api/auth/logout', (req, res) => { logout(req, res); res.json({ ok: true }); });
+app.get('/auth/logout', (req, res) => { logout(req, res); res.redirect('/login'); });
+
+// Keep old URLs working so nothing ends in "Cannot GET".
+app.get('/auth/login', (_req, res) => res.redirect('/login'));
+app.get('/login', (_req, res) => res.sendFile(path.join(publicDir, 'login.html')));
 
 app.get('/api/session', (req, res) => {
   const user = currentUser(req);
   if (!user) return res.status(401).json({ authenticated: false });
-  res.json({ authenticated: true, user: { openId: user.openId, name: user.name, email: user.email } });
+  res.json({ authenticated: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
 app.get(['/', '/index.html'], requireAuth, (_req, res) => res.sendFile(path.join(publicDir, 'index.html')));
@@ -203,7 +243,7 @@ function normalizeDevice(row) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'gps-system', time: new Date().toISOString() }));
 app.get('/api/devices', requireAuth, (_req, res) => res.json(db.prepare('SELECT * FROM devices ORDER BY id ASC').all().map(normalizeDevice)));
-app.post('/api/devices', requireAuth, (req, res) => {
+app.post('/api/devices', requireAuth, requireAdmin, (req, res) => {
   const name = String(req.body?.name || '').trim();
   const deviceType = String(req.body?.deviceType || 'smartphone').trim();
   if (!name) return res.status(400).json({ error: 'Device name is required.' });
