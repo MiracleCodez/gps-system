@@ -18,3 +18,8 @@ The source diagrams are Mermaid files in `diagrams/`. Rendered PNGs are in `rend
 ## Suggested evidence to add later
 
 Add screenshots of the dashboard, tracker page, map route, API response, and test execution. For the final thesis, also add a signed approval page, questionnaire or evaluation instrument if required by your department, and the final bibliography using your institution's citation style.
+
+
+## Working-system screenshots
+
+The repository also contains interface evidence captured from the working application in [`../screenshots/`](../screenshots/). The final-year thesis includes captions and discussion for the first-run setup, authenticated dashboard, map, route history, location permission, online tracker, and sign-in validation states.
