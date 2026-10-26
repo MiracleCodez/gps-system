@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS System — User Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">⌁</span><span>GPS <b>system</b></span></a>
+    <div class="topbar-meta"><span class="pulse-dot"></span><span>Viewer dashboard</span><span class="divider"></span><span id="account-name" class="account-name">Signed in</span><a href="/tracker.html" class="button button-small button-ghost">Open phone tracker ↗</a><a href="/auth/logout" class="button button-small button-ghost">Sign out</a></div>
+  </header>
+  <main class="workspace">
+    <section class="intro-row">
+      <div><p class="eyebrow">Live fleet visibility / <span id="clock">--:--:--</span></p><h1>Know where your field team is.</h1><p class="lede">A lightweight command center for smartphone-powered GPS tracking.</p></div>
+      <div class="refresh-note"><span class="refresh-icon">↻</span> Auto-refreshing every 10 seconds</div>
+    </section>
+    <section class="metrics" id="metrics"></section>
+    <section class="dashboard-grid">
+      <div class="map-panel panel"><div class="panel-head"><div><p class="eyebrow">Live map</p><h2>Tracker locations</h2></div><span class="live-badge"><i></i> LIVE</span></div><div id="map"></div><div class="map-legend"><span><i class="legend-dot online"></i> Online</span><span><i class="legend-dot offline"></i> Offline</span><span class="map-footnote">Location updates are stored in your local SQLite database</span></div></div>
+      <aside class="side-column">
+        <div class="panel device-panel"><div class="panel-head"><div><p class="eyebrow">Fleet registry</p><h2>Trackers</h2></div></div><div id="device-list" class="device-list"></div><form id="add-form" class="add-form hidden"><input id="device-name" required maxlength="60" placeholder="e.g. Field phone 02"><select id="device-type"><option value="smartphone">Smartphone</option><option value="gps-device">GPS device</option></select><button class="button button-primary" type="submit">Add tracker</button></form></div>
+        <div class="panel detail-panel"><div class="panel-head"><div><p class="eyebrow">Selected tracker</p><h2 id="selected-name">Choose a tracker</h2></div><span id="selected-status" class="status-chip">—</span></div><div id="detail-content" class="detail-content empty-state">Select a tracker to inspect its latest telemetry and route history.</div></div>
+      </aside>
+    </section>
+    <section class="panel history-panel"><div class="panel-head"><div><p class="eyebrow">Route history</p><h2>Recent location points</h2></div><span id="history-count" class="muted">—</span></div><div class="table-wrap"><table><thead><tr><th>Recorded</th><th>Latitude</th><th>Longitude</th><th>Speed</th><th>Accuracy</th></tr></thead><tbody id="history-body"><tr><td colspan="5" class="empty-state">Select a tracker to see its history.</td></tr></tbody></table></div></section>
+    <section class="panel trips-panel"><div class="panel-head"><div><p class="eyebrow">Trip reporting</p><h2>Recent trips</h2></div><span id="trips-count" class="muted">—</span></div><div class="table-wrap"><table><thead><tr><th>Tracker</th><th>Started</th><th>Ended</th><th>Duration</th><th>Distance</th><th>Points</th><th>Status</th></tr></thead><tbody id="trips-body"><tr><td colspan="7" class="empty-state">Loading trips…</td></tr></tbody></table></div></section>
+  </main>
+  <footer><span>GPS system / user dashboard</span><span>Built for the Nyanza District BSc thesis system</span></footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="/app.js"></script>
+</body>
+</html>
